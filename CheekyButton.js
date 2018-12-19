@@ -1,6 +1,6 @@
 import React from 'react'
-import { View, Text, StyleSheet, Animated, Dimensions, LayoutAnimation } from 'react-native'
-import { GestureHandler } from 'expo'
+import { View, Text, StyleSheet, Animated, Dimensions, LayoutAnimation, Vibration, PanResponder } from 'react-native'
+import { GestureHandler,  } from 'expo'
 
 const { PanGestureHandler, TapGestureHandler, LongPressGestureHandler, State } = GestureHandler
 
@@ -12,7 +12,7 @@ const RADIUS_BUBBLE = windowWidth / 5
 
 const COLLAPSED_ARC_RADIUS = 1
 const EXPANDED_ARC_RADIUS = 125
-console.log(State)
+
 class CheekyButton extends React.Component {
   constructor(props) {
     super(props)
@@ -27,67 +27,9 @@ class CheekyButton extends React.Component {
       }],
       radiusArc: COLLAPSED_ARC_RADIUS,
     }
-
-    this._translateX = new Animated.Value(0)
-    this._translateY = new Animated.Value(0)
-
-    this._onLongPress = ({ nativeEvent }) => {
-      if (nativeEvent.state === State.ACTIVE) {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.spring)
-        this.setState({
-          radiusArc: EXPANDED_ARC_RADIUS,
-        })
-        // console.log('I\'m being pressed for so long')
-      }
-    }
-
-    this._onSingleTap = ({ nativeEvent }) => {
-      if (nativeEvent.state === State.ACTIVE) {
-        // console.log('I\'m being tapped')
-      }
-    }
-
-    this._onPanEvent = ({ nativeEvent }) => {
-      console.log('_onPanEvent', nativeEvent.state)
-      switch (nativeEvent.state) {
-        case State.ACTIVE:
-          // console.log('I\'m being dragged')
-          break
-        default:
-          break
-      }
-    }
-
-    this._onDrag = ({ nativeEvent }) => {
-      console.log('_onDrag', nativeEvent.state)
-      switch (nativeEvent.state) {
-        case State.END:
-          LayoutAnimation.configureNext({
-            ...LayoutAnimation.Presets.easeInEaseOut,
-            duration: 100
-          })
-          this.setState({
-            radiusArc: COLLAPSED_ARC_RADIUS,
-          })
-        default:
-          break
-      }
-    }
   }
 
-  _dragRef = React.createRef()
   _longPressRef = React.createRef()
-    _tapRef = React.createRef()
-
-  componentWillMount() {
-    this._translateX.addListener(this._handleDrag)
-    this._translateY.addListener(this._handleDrag)
-  }
-
-  componentWillUnmount() {
-    this._translateX.removeListener(this._handleDrag)
-    this._translateY.removeListener(this._handleDrag)
-  }
 
   _getBubblePosition = (indice, origin, radiusArc) => {
     const {
@@ -105,6 +47,29 @@ class CheekyButton extends React.Component {
       y: origin.y - Math.sin(angleBubble) * radiusArc,
     }
   }
+
+  _expand = () => {
+    LayoutAnimation.configureNext({
+      ...LayoutAnimation.Presets.spring,
+      duration: 250
+    })
+    this.setState({
+      radiusArc: EXPANDED_ARC_RADIUS,
+    })
+  }
+
+
+  _collapse = () => {
+    LayoutAnimation.configureNext({
+      ...LayoutAnimation.Presets.easeInEaseOut,
+      duration: 100
+    })
+    this.setState({
+      radiusArc: COLLAPSED_ARC_RADIUS,
+    })
+  }
+
+
   render() {
     const {
       options,
@@ -144,44 +109,30 @@ class CheekyButton extends React.Component {
             </View>
           )})
         }
-        <PanGestureHandler
-          ref={this._dragRef}
-          onGestureEvent={this._onPanEvent}
-          onHandlerStateChange={this._onDrag}
-          simultaneousHandlers={[this._longPressRef, this._tapRef]}
-          
-        >
         <LongPressGestureHandler
           ref={this._longPressRef}
-          onHandlerStateChange={this._onLongPress}
-          minDurationMs={HOLD_DURATION}
-          simultaneousHandlers={[this._dragRef, this._tapRef]}
+          onActivated={this._expand}
         >
-          <TapGestureHandler
-            ref={this._tapRef}
-            onHandlerStateChange={this._onSingleTap}
-            simultaneousHandlers={[this._dragRef]}
+          <PanGestureHandler
+            onEnded={this._collapse}
+            simultaneousHandlers={[this._longPressRef]}
           >
-            
               <View
-                style={[
-                  styles.cheekyButton, {
-                  position: 'absolute',
-                  left: origin.x,
-                  top: origin.y,
-                }]}
-              >  
-                <Text
-                  style={styles.buttonText}
-                >
-                  {'Hold me'}
-                </Text>
-              </View>
-          </TapGestureHandler>
+                  style={[
+                    styles.cheekyButton, {
+                    position: 'absolute',
+                    left: origin.x,
+                    top: origin.y,
+                  }]}
+                >  
+                  <Text
+                    style={styles.buttonText}
+                  >
+                    {'Hold me'}
+                  </Text>
+                </View>
+          </PanGestureHandler>
         </LongPressGestureHandler>
-            </PanGestureHandler>
-
-        
       </View>
     )
   }
