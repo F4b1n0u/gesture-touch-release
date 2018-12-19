@@ -1,18 +1,20 @@
 import React from 'react'
-import { View, Text, StyleSheet, Animated, Dimensions, LayoutAnimation, Vibration, PanResponder } from 'react-native'
+import { View, Text, StyleSheet, Dimensions, LayoutAnimation } from 'react-native'
 import { GestureHandler,  } from 'expo'
 
-const { PanGestureHandler, TapGestureHandler, LongPressGestureHandler, State } = GestureHandler
+const { PanGestureHandler, LongPressGestureHandler } = GestureHandler
 
-const { width: windowWidth } = Dimensions.get('window')
+const { width: windowWidth, height: windowHeight } = Dimensions.get('window')
 
-const HOLD_DURATION = 250
-
-const RADIUS_BUBBLE = windowWidth / 5
+const RADIUS_BUBBLE = windowWidth / 10
 
 const COLLAPSED_ARC_RADIUS = 1
 const EXPANDED_ARC_RADIUS = 125
 
+const ORIGIN = {
+  x: windowWidth / 2 - RADIUS_BUBBLE,
+  y: windowHeight / 2 - RADIUS_BUBBLE,
+}
 class CheekyButton extends React.Component {
   constructor(props) {
     super(props)
@@ -37,7 +39,7 @@ class CheekyButton extends React.Component {
     } = this.state
     
     const amountOfBubble = options.length
-    const bubbleSpace = -65
+    const bubbleSpace = 20
     const angleRotation = 0
 
     const angleArc = (amountOfBubble - 1) * (2 * RADIUS_BUBBLE + bubbleSpace) / radiusArc
@@ -76,20 +78,15 @@ class CheekyButton extends React.Component {
       radiusArc,
     } = this.state
 
-    const origin = {
-      x: 150,
-      y: 300,
-    }
-
     return (
       <View>
         {options.map(({ label }, index) => {
           const position = radiusArc ? (
-            this._getBubblePosition(index, origin, radiusArc) 
+            this._getBubblePosition(index, ORIGIN, radiusArc) 
           ) : (
-            origin
+            ORIGIN
           )
-          const { x: left, y: top } = position
+          const { x: right, y: top } = position
 
           return (
             <View
@@ -98,7 +95,7 @@ class CheekyButton extends React.Component {
                 styles.cheekyButton, {
                 position: 'absolute',
                 top,
-                left,
+                right,
               }]}
             >
               <Text
@@ -121,8 +118,8 @@ class CheekyButton extends React.Component {
                   style={[
                     styles.cheekyButton, {
                     position: 'absolute',
-                    left: origin.x,
-                    top: origin.y,
+                    right: ORIGIN.x,
+                    top: ORIGIN.y,
                   }]}
                 >  
                   <Text
@@ -142,7 +139,7 @@ const styles = StyleSheet.create({
   cheekyButton: {
     backgroundColor: '#FF0000',
     aspectRatio: 1,
-    width: RADIUS_BUBBLE,
+    width: RADIUS_BUBBLE * 2,
     borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
@@ -150,7 +147,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     backgroundColor: '#00FF00',
     aspectRatio: 1,
-    width: RADIUS_BUBBLE,
+    width: RADIUS_BUBBLE * 2,
     borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
