@@ -14,10 +14,10 @@
             buildForArchiving = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "FF2817D5D24893FC9FC9E4C45733A7C8"
-               BlueprintName = "Pods-gesture-release"
+               BlueprintIdentifier = "9625C0AC5AD7E37EA0A803FCC2F026CF"
+               BlueprintName = "react-native-haptic-feedback"
                ReferencedContainer = "container:Pods.xcodeproj"
-               BuildableName = "libPods-gesture-release.a">
+               BuildableName = "libreact-native-haptic-feedback.a">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>

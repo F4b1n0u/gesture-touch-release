@@ -183,6 +183,8 @@ PODS:
   - lottie-ios (2.5.2)
   - React (0.57.1):
     - React/Core (= 0.57.1)
+  - react-native-haptic-feedback (1.4.2):
+    - React
   - React/ART (0.57.1):
     - React/Core
   - React/Core (0.57.1):
@@ -267,6 +269,7 @@ DEPENDENCIES:
   - EXSMS (from `../node_modules/expo-sms/ios`)
   - Folly (from `../node_modules/react-native/third-party-podspecs/Folly.podspec`)
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
+  - react-native-haptic-feedback (from `../node_modules/react-native-haptic-feedback`)
   - React/ART (from `../node_modules/react-native`)
   - React/Core (from `../node_modules/react-native`)
   - React/CxxBridge (from `../node_modules/react-native`)
@@ -379,6 +382,8 @@ EXTERNAL SOURCES:
     :podspec: "../node_modules/react-native/third-party-podspecs/glog.podspec"
   React:
     :path: "../node_modules/react-native"
+  react-native-haptic-feedback:
+    :path: "../node_modules/react-native-haptic-feedback"
   yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -444,9 +449,10 @@ SPEC CHECKSUMS:
   JKBigInteger2: e91672035c42328c48b7dd015b66812ddf40ca9b
   lottie-ios: 3fef45d3fabe63e3c7c2eb603dd64ddfffc73062
   React: 1fe0eb13d90b625d94c3b117c274dcfd2e760e11
+  react-native-haptic-feedback: f675486e3889e3229272158943c1e9e075247e5a
   Stripe: 76c203e21555089b708e6cbe972a3e3baf1ab4d8
   yoga: b1ce48b6cf950b98deae82838f5173ea7cf89e85
 
-PODFILE CHECKSUM: b409abb9e29d935c830e357bdb22e07768640cf5
+PODFILE CHECKSUM: 8d9aa705c04b3fa6a37cf3e060d719a7ea2f8565
 
 COCOAPODS: 1.5.3

@@ -219,6 +219,11 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
+		<key>react-native-haptic-feedback.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>yoga.xcscheme</key>
 		<dict>
 			<key>isShown</key>
