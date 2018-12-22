@@ -3,18 +3,19 @@ import { View, Text, StyleSheet, Dimensions, LayoutAnimation, Animated } from 'r
 import { GestureHandler } from 'expo'
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback'
 
-const { PanGestureHandler, TapGestureHandler } = GestureHandler
+const { PanGestureHandler, LongPressGestureHandler, NativeViewGestureHandler } = GestureHandler
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
 const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 3
-const HIGHLIGTHED_ARC_RADIUS = EXPANDED_ARC_RADIUS * 1.1
-const DEADZONE_ARC_RADIUS = EXPANDED_BUBBLE_RADIUS * 2
+const HIGHLIGTHED_ON_RATIO = .8
+const HIGHLIGTHED_OFF_RATIO = .5
+
 
 const EXPANDED_BUBBLE_RADIUS = WINDOW_WIDTH / 10
 const COLLAPSED_BUBBLE_RADIUS = WINDOW_WIDTH / 10
 const HIGHLIGTHED_BUBBLE_RADIUS = EXPANDED_BUBBLE_RADIUS
-const BUBBLE_SPACING = 20
+const BUBBLE_SPACING = 10
 
 const ORIGIN = {
   x: WINDOW_WIDTH / 2,
@@ -40,19 +41,24 @@ class CheekyButton extends React.Component {
       },
       {
         label: 'E',
+      },
+      {
+        label: 'F',
+      },
+      {
+        label: 'G',
+      },
+      {
+        label: 'H',
       }
     ],
       isExpanded: false,
-      hasHighligthedBubble: false,
-      highligthedBubbleIndex: null,
-      highligthedArcRadius: EXPANDED_ARC_RADIUS
     }
   }
 
   _longPressRef = React.createRef()
+  _touchRef = React.createRef()
   _touchXY = new Animated.ValueXY()
-  _touchedExpandedArcAngle = new Animated.Value()
-  _touchedExpandedArcRadius = new Animated.Value()
   _onPanGestureEvent = Animated.event([{
     nativeEvent: {
       translationX: this._touchXY.x,
@@ -62,12 +68,190 @@ class CheekyButton extends React.Component {
     useNativeDriver: true
   })
 
-  _handleTouchXY = ({ x, y }) => {
+  _expand = () => {
+    this.setState({
+      isExpanded: true,
+    }, () => {
+      ReactNativeHapticFeedback.trigger('impactHeavy')
+    })
+  }
+
+  _collapse = () => {
+    this.setState({
+      isExpanded: false,
+    })
+  }
+
+  render() {
+    const {
+      options,
+      isExpanded,
+    } = this.state
+
+    return (
+      <View>
+        {options.map(({label, ...bubble}, position) => (
+          <Bubble
+            key={label}
+            origin={ORIGIN}
+            isExpanded={isExpanded}
+            radius={COLLAPSED_BUBBLE_RADIUS}
+            position={position}
+            touch={this._touchXY}
+            bubbleQuantity={options.length}
+            {...bubble}
+          >
+            <Text
+              style={styles.buttonText}
+            >
+              {label}
+            </Text>
+          </Bubble>
+        ))}
+        <LongPressGestureHandler
+          ref={this._longPressRef}
+          onActivated={this._expand}
+        >
+          <View>
+            <NativeViewGestureHandler>
+              <View>
+                <PanGestureHandler
+                  onGestureEvent={this._onPanGestureEvent}
+                  isExpanded={false}
+                  // onActivated={this._expand}
+                  onEnded={this._collapse}
+                  simultaneousHandlers={[this._longPressRef]}
+                >
+                  <Animated.View>
+                    <Bubble
+                      origin={ORIGIN}
+                      radius={COLLAPSED_BUBBLE_RADIUS}
+                      backgroundColor={'#aaaaaa'}
+                    >
+                      <Text
+                        style={styles.buttonText}
+                      >
+                        {'Hold me'}
+                      </Text>
+                    </Bubble>
+                  </Animated.View>
+                </PanGestureHandler>
+              </View>
+            </NativeViewGestureHandler>
+          </View>
+        </LongPressGestureHandler>
+      </View>
+    )
+  }
+}
+
+const styles = StyleSheet.create({
+  bubble: {
+    position: 'absolute',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    textAlign: 'center',
+  }
+})
+
+class Bubble extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      isTargeted: false,
+      isHighligthed: false,
+    }
+  }
+
+  _translatePosition = new Animated.ValueXY({ x: 0, y: 0 })
+
+  _getAngleRotation = () => {
+    const {
+      bubbleQuantity,
+    } = this.props
+
+    return Math.PI / 2 - (this._getAngle() * (bubbleQuantity - 1)) / 2
+  }
+
+  _getExpandedDistance = () => {
+    // TODO need to depend of the position of the finger
+    return EXPANDED_ARC_RADIUS
+  }
+
+  _getAngle = () => {
+    const {
+      radius,
+    } = this.props
+
+    const expandedDistance = this._getExpandedDistance()
+    
+    return 2 * (radius + BUBBLE_SPACING) / expandedDistance
+  }
+
+  _getOffsetAngle = () => {
+    const {
+      radius,
+      position,
+    } = this.props
+
+    const angleRotation = this._getAngleRotation()
+    const angle = this._getAngle()
+
+    return angleRotation + position * angle
+  }
+
+  _handlePosition = (onExpanded = () => {}, onCollapsed = () => {}) => {
+    const {
+      isExpanded,
+    } = this.props
+
+    if (!isExpanded) {
+      const expandedDistance = this._getExpandedDistance()
+      const offsetAngle = this._getOffsetAngle()
+
+      // duration shoudl depend on how far we already 
+      Animated.parallel([
+        Animated.timing(this._translatePosition.x, {
+          toValue: + Math.cos(offsetAngle) * expandedDistance,
+          duration: 125,
+        }),
+        Animated.timing(this._translatePosition.y, {
+          toValue: - Math.sin(offsetAngle) * expandedDistance,
+          duration: 125,
+        })
+      ]).start(onExpanded)      
+    } else {
+      Animated.parallel([
+        Animated.timing(this._translatePosition.x, {
+          toValue: 0,
+          duration: 90,
+        }),
+        Animated.timing(this._translatePosition.y, {
+          toValue: 0,
+          duration: 90,
+        })
+      ]).start(onCollapsed)   
+    }
+  }
+
+  _handleHighlighted = ({ x, y }) => {
     const {
       isExpanded,
     } = this.state
 
     const distance = Math.sqrt(x * x + y * y)
+    
+    if (isExpanded) {
+      
+    }
+  }
+
+  _getTouchAngle = ({ x, y }) => {
     let angleOffset
     let sides = (y * x) < 0 ? (
       sides = y / x
@@ -88,252 +272,110 @@ class CheekyButton extends React.Component {
       }
     }
 
-    const angle = Math.atan(Math.abs(sides)) + angleOffset
-
-    if (isExpanded) {
-      this._touchedExpandedArcRadius.setValue(distance)
-      this._touchedExpandedArcAngle.setValue(angle)
-    }
+    return Math.atan(Math.abs(sides)) + angleOffset
   }
 
-  _handleExpandedArcRadius = ({ value }) => {
-    if (value > DEADZONE_ARC_RADIUS) {
-      this.setState({
-        hasHighligthedBubble: true
-      })
-    } else {
-      this.setState({
-        hasHighligthedBubble: false,
-      })
-    }
-  }
-
-  _handleExpandedArcAngle = ({ value }) => {
+  _handleTargeted = ({ x, y }) => {
     const {
-      options,
-      hasHighligthedBubble,
-      highligthedBubbleIndex: currentlyHighligthedBubbleIndex,
-    } = this.state
-
-    const angleRotation = this._getAngleArcRotation()
-
-    const angleArc = this._getAngleArc()
-    const anglePerBubble = angleArc / options.length
-
-    const highligthedBubbleIndex = (Math.PI - value / anglePerBubble).toFixed(0)
-
-    LayoutAnimation.configureNext({
-      ...LayoutAnimation.Presets.easeInEaseOut,
-      duration: 250
-    })
-
-    if (hasHighligthedBubble) {
-      if (currentlyHighligthedBubbleIndex != highligthedBubbleIndex) {
-        ReactNativeHapticFeedback.trigger('impactMedium')
-      }
-
-      this.setState({
-        highligthedArcRadius: HIGHLIGTHED_ARC_RADIUS,
-        highligthedBubbleIndex,
-      })
-    } else {
-      this.setState({
-        highligthedArcRadius: EXPANDED_ARC_RADIUS,
-        highligthedBubbleIndex: null,
-      })
-    }
-  }
-
-  _getBubblesAngleArc = () => {
-    const {
-      options: {
-        length: amountOfBubble,
-      },
-    } = this.state
-    // it's an appromative calculs but close enough to the real deal
-    return amountOfBubble * 2 * (EXPANDED_BUBBLE_RADIUS) / EXPANDED_ARC_RADIUS
-  }
-
-  _getSpacingAngleArc = () => {
-    const {
-      options: {
-        length: amountOfBubble,
-      },
-    } = this.state
-    // it's an appromative calculs but close enough to the real deal
-    return amountOfBubble * 2 * (BUBBLE_SPACING) / EXPANDED_ARC_RADIUS
-  }
-
-  _getAngleArc = () => {
-    return this._getSpacingAngleArc() + this._getBubblesAngleArc()
-  }
-
-  _getAngleArcRotation = (center) => {
-    return 0
-  }
-
-  _getBubbleDetails = (index, center) => {
-    const {
-      options: {
-        length: amountOfBubble,
-      },
       isExpanded,
-      hasHighligthedBubble,
-      highligthedBubbleIndex,
-      highligthedArcRadius,
+      position,
+    } = this.props
+
+    const {
+      isTargeted,
     } = this.state
-    
-    if (!isExpanded) {
-      return {
-        center,
-        radius: COLLAPSED_BUBBLE_RADIUS,
-        backgroundColor: 'FF0000',
+
+    const touchAngle = this._getTouchAngle({ x, y })
+    const angle = this._getAngle()
+    const offsetAngle = this._getOffsetAngle()
+    const relativeAngle = touchAngle - offsetAngle
+
+    if (position === 0) {
+      console.log(offsetAngle, angle, relativeAngle)
+    }
+
+    if (
+      relativeAngle > - angle / 2
+      &&
+      relativeAngle < + angle / 2
+    ) {
+      if (isExpanded && !isTargeted) {
+        this.setState({
+          isTargeted: true,
+        })
       }
     } else {
-      const angleRotation = this._getAngleArcRotation()
-
-      const angleArc = this._getAngleArc()
-
-      const relativeAngleBubble = index * angleArc / amountOfBubble
-      const absoluteAngleBubble = relativeAngleBubble + angleRotation
-      const isHighligthedBubble = highligthedBubbleIndex == index
-      
-      const arcRadius = isHighligthedBubble ? highligthedArcRadius : EXPANDED_ARC_RADIUS
-      const backgroundColor = isHighligthedBubble ? '#FF0000' : '#00FF00'
-      const bubbleRadius = hasHighligthedBubble ? COLLAPSED_BUBBLE_RADIUS : HIGHLIGTHED_BUBBLE_RADIUS
-
-      return {
-        center: {
-          x: center.x - Math.sin(absoluteAngleBubble) * arcRadius,
-          y: center.y - Math.cos(absoluteAngleBubble) * arcRadius,
-        },
-        radius: bubbleRadius,
-        backgroundColor,
+      if (isExpanded && isTargeted) {
+        this.setState({
+          isTargeted: false,
+        })
       }
     }
   }
 
-  _expand = () => {
-    LayoutAnimation.configureNext({
-      ...LayoutAnimation.Presets.easeInEaseOut,
-      duration: 250
-    })
-    this.setState({
-      isExpanded: true,
-    }, () => {
-      ReactNativeHapticFeedback.trigger('impactHeavy')
-    })
-  }
+  componentWillUpdate({ isExpanded: wasExpanded }) {
+    const {
+      isExpanded,
+    } = this.props
 
-  _collapse = () => {
-    LayoutAnimation.configureNext({
-      ...LayoutAnimation.Presets.easeInEaseOut,
-      duration: 100
-    })
-    this.setState({
-      isExpanded: false,
-    })
+    const needPositionAnimation = wasExpanded !== isExpanded
+    
+    if (needPositionAnimation) {
+      this._handlePosition(null, () => {
+        this.setState({
+          isTargeted: false
+        })
+      })
+    }
   }
 
   componentWillMount() {
-    this._touchXY.addListener(this._handleTouchXY)
-    this._touchedExpandedArcRadius.addListener(this._handleExpandedArcRadius)
-    this._touchedExpandedArcAngle.addListener(this._handleExpandedArcAngle)
+    const {
+      touch,
+    } = this.props
+
+    if (touch) {
+      touch.addListener(this._handleHighlighted)
+      touch.addListener(this._handleTargeted)
+    }
   }
 
   componentWillUnmount() {
-    this._touchXY.removeListener(this._handleTouchXY)
-    this._touchedExpandedArcRadius.removeListener(this._handleExpandedArcRadius)
-    this._touchedExpandedArcAngle.removeListener(this._handleExpandedArcAngle)
-  }
-
-  render() {
     const {
-      options,
-    } = this.state
+      touch,
+    } = this.props
 
-    return (
-      <View>
-        {options.map(({ label }, index) => {
-          const bubbleDetails = this._getBubbleDetails(index, ORIGIN) 
-
-          return (
-            <Bubble
-              key={label}
-              {...bubbleDetails}
-            >
-              <Text
-                style={styles.buttonText}
-              >
-                {label}
-              </Text>
-            </Bubble>
-          )})
-        }
-        <TapGestureHandler
-          ref={this._longPressRef}
-          // onActivated={this._expand}
-        >
-          <View>
-            <PanGestureHandler
-              onGestureEvent={this._onPanGestureEvent}
-              onBegan={this._expand}
-              onEnded={this._collapse}
-              simultaneousHandlers={[this._longPressRef]}
-            >
-              <Animated.View>
-                <Bubble
-                  center={ORIGIN}
-                  radius={COLLAPSED_BUBBLE_RADIUS}
-                  backgroundColor={'#aaaaaa'}
-                >
-                  <Text
-                    style={styles.buttonText}
-                  >
-                    {'Hold me'}
-                  </Text>
-                </Bubble>
-              </Animated.View>
-            </PanGestureHandler>
-          </View>
-        </TapGestureHandler>
-      </View>
-    )
+    if (touch) {
+      touch.removeListener(this._handleHighlighted)
+      touch.removeListener(this._handleTargeted)
+    }
   }
-}
 
-const styles = StyleSheet.create({
-  bubble: {
-    position: 'absolute',
-    aspectRatio: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    textAlign: 'center',
-  }
-})
-
-class Bubble extends React.Component {
   render() {
     const {
       children,
-      center,
       radius,
-      backgroundColor,
+      origin,
     } = this.props
 
+    const {
+      isTargeted,
+    } = this.state
+
+    // TODO used animation to change the color
+    const backgroundColor = isTargeted ? '#770000' : '#00ff00'
+
     return (
-      <View
+      <Animated.View
         style={[
           styles.bubble,
           {
-            top: center.y - radius,
-            left: center.x - radius,
+            top: origin.y - radius,
+            left: origin.x - radius,
             width: radius * 2,
             borderRadius: radius,
             backgroundColor,
+            transform: this._translatePosition.getTranslateTransform(),
           },
         ]}
       >  
@@ -342,10 +384,9 @@ class Bubble extends React.Component {
         >
           {children}
         </Text>
-      </View>
+      </Animated.View>
     )
   }
 }
-
 
 export default CheekyButton
