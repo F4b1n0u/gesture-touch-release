@@ -20,6 +20,25 @@ const ORIGIN = {
   y: WINDOW_HEIGHT / 2,
 }
 
+// https://stackoverflow.com/questions/22658954/check-if-angle-is-between-angles-from-and-to-with-clockwise-direction
+// thanks xD
+function isInRange({ from, to, angle }) {
+  var _from  = from  % (2 * Math.PI),
+      _to    = to    % (2 * Math.PI),
+      _angle = angle % (2 * Math.PI);
+  if (_from  < 0) _from  += (2 * Math.PI); // (-500) % (2 * Math.PI) === -140 :(
+  if (_to    < 0) _to    += (2 * Math.PI);
+  if (_angle < 0) _angle += (2 * Math.PI);
+  if (_from === _to) {
+      if (to > from)
+          return true; // whole circle
+      return _angle === _from; // exact only
+  }
+  if (_to < _from)
+      return _angle <= _to || from <= _angle; // _angle outside range
+  return _from <= _angle && _angle <= _to;    // _angle inside range
+}
+
 class CheekyButton extends React.Component {
   constructor(props) {
     super(props)
@@ -286,17 +305,13 @@ class Bubble extends React.Component {
     const touchAngle = this._getTouchAngle({ x, y })
     const angle = this._getAngle()
     const offsetAngle = this._getOffsetAngle()
-    const relativeAngle = touchAngle - offsetAngle
-
-    if (position === 0) {
-      console.log(offsetAngle, angle, relativeAngle)
-    }
-
-    if (
-      relativeAngle > - angle / 2
-      &&
-      relativeAngle < + angle / 2
-    ) {
+    let relativeAngle = touchAngle - offsetAngle
+    
+    if (isInRange({
+      from: angle / 2,
+      to: - angle / 2,
+      angle: relativeAngle,
+    })) {
       if (isExpanded && !isTargeted) {
         this.setState({
           isTargeted: true,
