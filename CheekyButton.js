@@ -5,19 +5,20 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback'
 
 const { PanGestureHandler, TapGestureHandler } = GestureHandler
 
-const { width: windowWidth, height: windowHeight } = Dimensions.get('window')
+const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
-const EXPANDED_ARC_RADIUS =  windowWidth / 3
+const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 3
 const HIGHLIGTHED_ARC_RADIUS = EXPANDED_ARC_RADIUS * 1.1
 const DEADZONE_ARC_RADIUS = EXPANDED_BUBBLE_RADIUS * 2
-const EXPANDED_BUBBLE_RADIUS = windowWidth / 10
-const COLLAPSED_BUBBLE_RADIUS = windowWidth / 10
+
+const EXPANDED_BUBBLE_RADIUS = WINDOW_WIDTH / 10
+const COLLAPSED_BUBBLE_RADIUS = WINDOW_WIDTH / 10
 const HIGHLIGTHED_BUBBLE_RADIUS = EXPANDED_BUBBLE_RADIUS
-const BUBBLE_SPACING = windowWidth / 50
+const BUBBLE_SPACING = 20
 
 const ORIGIN = {
-  top: windowHeight / 2,
-  left: windowWidth / 2,
+  x: WINDOW_WIDTH / 2,
+  y: WINDOW_HEIGHT / 2,
 }
 
 class CheekyButton extends React.Component {
@@ -27,17 +28,20 @@ class CheekyButton extends React.Component {
     this.state = {
       options: [{
         label: 'A',
-      }, {
+      },
+      {
         label: 'B',
-      }, {
+      },
+      {
         label: 'C',
-      }, {
+      },
+      {
         label: 'D',
-      }, {
+      },
+      {
         label: 'E',
-      }, {
-        label: 'F',
-      }],
+      }
+    ],
       isExpanded: false,
       hasHighligthedBubble: false,
       highligthedBubbleIndex: null,
@@ -118,8 +122,6 @@ class CheekyButton extends React.Component {
 
     const highligthedBubbleIndex = (Math.PI - value / anglePerBubble).toFixed(0)
 
-    console.log(highligthedBubbleIndex)
-
     LayoutAnimation.configureNext({
       ...LayoutAnimation.Presets.easeInEaseOut,
       duration: 250
@@ -142,20 +144,35 @@ class CheekyButton extends React.Component {
     }
   }
 
-  _getAngleArc = () => {
+  _getBubblesAngleArc = () => {
     const {
       options: {
         length: amountOfBubble,
       },
     } = this.state
-
-    return (amountOfBubble - 1) * 2 * (EXPANDED_BUBBLE_RADIUS + BUBBLE_SPACING) / EXPANDED_ARC_RADIUS
+    // it's an appromative calculs but close enough to the real deal
+    return amountOfBubble * 2 * (EXPANDED_BUBBLE_RADIUS) / EXPANDED_ARC_RADIUS
   }
-  _getAngleArcRotation = (origin) => {
+
+  _getSpacingAngleArc = () => {
+    const {
+      options: {
+        length: amountOfBubble,
+      },
+    } = this.state
+    // it's an appromative calculs but close enough to the real deal
+    return amountOfBubble * 2 * (BUBBLE_SPACING) / EXPANDED_ARC_RADIUS
+  }
+
+  _getAngleArc = () => {
+    return this._getSpacingAngleArc() + this._getBubblesAngleArc()
+  }
+
+  _getAngleArcRotation = (center) => {
     return 0
   }
 
-  _getBubbleDetails = (index, origin) => {
+  _getBubbleDetails = (index, center) => {
     const {
       options: {
         length: amountOfBubble,
@@ -168,15 +185,17 @@ class CheekyButton extends React.Component {
     
     if (!isExpanded) {
       return {
-        top: origin.top - 2 * COLLAPSED_BUBBLE_RADIUS,
-        left: origin.left - COLLAPSED_BUBBLE_RADIUS,
-        width: COLLAPSED_BUBBLE_RADIUS * 2,
+        center,
+        radius: COLLAPSED_BUBBLE_RADIUS,
+        backgroundColor: 'FF0000',
       }
     } else {
       const angleRotation = this._getAngleArcRotation()
 
       const angleArc = this._getAngleArc()
-      const angleBubble = Math.PI / 2 + angleRotation + index * angleArc / (amountOfBubble - 1) - (angleArc / 2)
+
+      const relativeAngleBubble = index * angleArc / amountOfBubble
+      const absoluteAngleBubble = relativeAngleBubble + angleRotation
       const isHighligthedBubble = highligthedBubbleIndex == index
       
       const arcRadius = isHighligthedBubble ? highligthedArcRadius : EXPANDED_ARC_RADIUS
@@ -184,9 +203,11 @@ class CheekyButton extends React.Component {
       const bubbleRadius = hasHighligthedBubble ? COLLAPSED_BUBBLE_RADIUS : HIGHLIGTHED_BUBBLE_RADIUS
 
       return {
-        top: origin.top - 2 *bubbleRadius - Math.sin(angleBubble) * arcRadius,
-        left: origin.left - bubbleRadius - Math.cos(angleBubble) * arcRadius,
-        width: bubbleRadius * 2,
+        center: {
+          x: center.x - Math.sin(absoluteAngleBubble) * arcRadius,
+          y: center.y - Math.cos(absoluteAngleBubble) * arcRadius,
+        },
+        radius: bubbleRadius,
         backgroundColor,
       }
     }
@@ -229,76 +250,62 @@ class CheekyButton extends React.Component {
   render() {
     const {
       options,
-      hasHighligthedBubble
     } = this.state
 
     return (
-      <Animated.View>
+      <View>
         {options.map(({ label }, index) => {
           const bubbleDetails = this._getBubbleDetails(index, ORIGIN) 
-          
+
           return (
-            <View
+            <Bubble
               key={label}
-              style={[
-                styles.floatingButton, {
-                position: 'absolute',
-                ...bubbleDetails,
-              }]}
+              {...bubbleDetails}
             >
               <Text
                 style={styles.buttonText}
               >
                 {label}
               </Text>
-            </View>
+            </Bubble>
           )})
         }
         <TapGestureHandler
           ref={this._longPressRef}
           // onActivated={this._expand}
         >
-          <Animated.View>
+          <View>
             <PanGestureHandler
               onGestureEvent={this._onPanGestureEvent}
               onBegan={this._expand}
               onEnded={this._collapse}
               simultaneousHandlers={[this._longPressRef]}
             >
-                <Animated.View
-                    style={[
-                      styles.cheekyButton, {
-                      position: 'absolute',
-                      top: ORIGIN.top - 2 * EXPANDED_BUBBLE_RADIUS,
-                      left: ORIGIN.left - EXPANDED_BUBBLE_RADIUS,
-                    }]}
-                  >  
-                    <Text
-                      style={styles.buttonText}
-                    >
-                      {'Hold me'}
-                    </Text>
-                  </Animated.View>
+              <Animated.View>
+                <Bubble
+                  center={ORIGIN}
+                  radius={COLLAPSED_BUBBLE_RADIUS}
+                  backgroundColor={'#aaaaaa'}
+                >
+                  <Text
+                    style={styles.buttonText}
+                  >
+                    {'Hold me'}
+                  </Text>
+                </Bubble>
+              </Animated.View>
             </PanGestureHandler>
-          </Animated.View>
+          </View>
         </TapGestureHandler>
-      </Animated.View>
+      </View>
     )
   }
 }
 
 const styles = StyleSheet.create({
-  cheekyButton: {
-    backgroundColor: '#FF0000',
+  bubble: {
+    position: 'absolute',
     aspectRatio: 1,
-    width: EXPANDED_BUBBLE_RADIUS * 2,
-    borderRadius: HIGHLIGTHED_BUBBLE_RADIUS,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  floatingButton: {
-    aspectRatio: 1,
-    borderRadius: HIGHLIGTHED_BUBBLE_RADIUS,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -307,5 +314,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   }
 })
+
+class Bubble extends React.Component {
+  render() {
+    const {
+      children,
+      center,
+      radius,
+      backgroundColor,
+    } = this.props
+
+    return (
+      <View
+        style={[
+          styles.bubble,
+          {
+            top: center.y - radius,
+            left: center.x - radius,
+            width: radius * 2,
+            borderRadius: radius,
+            backgroundColor,
+          },
+        ]}
+      >  
+        <Text
+          style={styles.buttonText}
+        >
+          {children}
+        </Text>
+      </View>
+    )
+  }
+}
+
 
 export default CheekyButton
