@@ -7,15 +7,13 @@ const { PanGestureHandler, LongPressGestureHandler, NativeViewGestureHandler } =
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
+const BUBBLE_RADIUS = WINDOW_WIDTH / 10
+const BUBBLE_SPACING = WINDOW_WIDTH / 35
 const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 3
-const HIGHLIGTHED_ON_RATIO = .8
-const HIGHLIGTHED_OFF_RATIO = .5
 
-
-const EXPANDED_BUBBLE_RADIUS = WINDOW_WIDTH / 10
-const COLLAPSED_BUBBLE_RADIUS = WINDOW_WIDTH / 10
-const HIGHLIGTHED_BUBBLE_RADIUS = EXPANDED_BUBBLE_RADIUS
-const BUBBLE_SPACING = 10
+const HIGHLIGTHED_ON_RATIO = .2
+const HIGHLIGTHED_OFF_RATIO = .4
+const HIGHLIGTHED_BUBBLE_RADIUS_RATIO = 1.2
 
 const ORIGIN = {
   x: WINDOW_WIDTH / 2,
@@ -95,7 +93,7 @@ class CheekyButton extends React.Component {
             key={label}
             origin={ORIGIN}
             isExpanded={isExpanded}
-            radius={COLLAPSED_BUBBLE_RADIUS}
+            radius={BUBBLE_RADIUS}
             position={position}
             touch={this._touchXY}
             bubbleQuantity={options.length}
@@ -125,7 +123,7 @@ class CheekyButton extends React.Component {
                   <Animated.View>
                     <Bubble
                       origin={ORIGIN}
-                      radius={COLLAPSED_BUBBLE_RADIUS}
+                      radius={BUBBLE_RADIUS}
                       backgroundColor={'#aaaaaa'}
                     >
                       <Text
