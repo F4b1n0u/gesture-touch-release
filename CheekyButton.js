@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, Text, StyleSheet, Dimensions, LayoutAnimation, Animated } from 'react-native'
+import { View, Text, StyleSheet, Dimensions, Easing, Animated } from 'react-native'
 import { GestureHandler } from 'expo'
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback'
 
@@ -11,8 +11,9 @@ const BUBBLE_RADIUS = WINDOW_WIDTH / 10
 const BUBBLE_SPACING = WINDOW_WIDTH / 35
 const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 3
 
-const HIGHLIGTHED_ON_RATIO = .2
-const HIGHLIGTHED_OFF_RATIO = .4
+const SELECTED_ON_RATIO = .2
+const SELECTED_OFF_RATIO = .4
+
 const HIGHLIGTHED_BUBBLE_RADIUS_RATIO = 1.2
 
 const ORIGIN = {
@@ -44,7 +45,8 @@ class CheekyButton extends React.Component {
     super(props)
 
     this.state = {
-      options: [{
+      options: [
+      {
         label: 'A',
       },
       {
@@ -59,15 +61,15 @@ class CheekyButton extends React.Component {
       {
         label: 'E',
       },
-      {
-        label: 'F',
-      },
-      {
-        label: 'G',
-      },
-      {
-        label: 'H',
-      }
+      // {
+      //   label: 'F',
+      // },
+      // {
+      //   label: 'G',
+      // },
+      // {
+      //   label: 'H',
+      // }
     ],
       isExpanded: false,
     }
@@ -143,7 +145,7 @@ class CheekyButton extends React.Component {
                     <Bubble
                       origin={ORIGIN}
                       radius={BUBBLE_RADIUS}
-                      backgroundColor={'#aaaaaa'}
+                      backgroundColor={'#AAAAAA'}
                     >
                       <Text
                         style={styles.buttonText}
@@ -186,6 +188,16 @@ class Bubble extends React.Component {
   }
 
   _translatePosition = new Animated.ValueXY({ x: 0, y: 0 })
+  _touchDistance = new Animated.Value(EXPANDED_ARC_RADIUS)
+  _highligtedTranslateRatio = this._touchDistance.interpolate({
+    inputRange:  [0, EXPANDED_ARC_RADIUS,             2 * EXPANDED_ARC_RADIUS],
+    outputRange: [1, HIGHLIGTHED_BUBBLE_RADIUS_RATIO, 1],
+    easing: Easing.inOut(Easing.linear),
+    extrapolate: 'clamp',
+    useNativeDriver: true,
+  })
+  _highligtedTranslatePositionX = Animated.multiply(this._translatePosition.x, this._highligtedTranslateRatio)
+  _highligtedTranslatePositionY = Animated.multiply(this._translatePosition.y, this._highligtedTranslateRatio)
 
   _getAngleRotation = () => {
     const {
@@ -212,7 +224,6 @@ class Bubble extends React.Component {
 
   _getOffsetAngle = () => {
     const {
-      radius,
       position,
     } = this.props
 
@@ -258,13 +269,19 @@ class Bubble extends React.Component {
 
   _handleHighlighted = ({ x, y }) => {
     const {
-      isExpanded,
+      isTargeted,
     } = this.state
 
     const distance = Math.sqrt(x * x + y * y)
     
-    if (isExpanded) {
-      
+
+    if (isTargeted) {
+      this._touchDistance.setValue(distance)
+    } else {
+      Animated.timing(this._touchDistance, {
+        toValue: EXPANDED_ARC_RADIUS,
+        duration: 125,
+      }).start()
     }
   }
 
@@ -295,7 +312,6 @@ class Bubble extends React.Component {
   _handleTargeted = ({ x, y }) => {
     const {
       isExpanded,
-      position,
     } = this.props
 
     const {
@@ -311,16 +327,16 @@ class Bubble extends React.Component {
       from: angle / 2,
       to: - angle / 2,
       angle: relativeAngle,
-    })) {
-      if (isExpanded && !isTargeted) {
-        this.setState({
-          isTargeted: true,
-        })
-      }
-    } else {
+    })) { // not targeted
       if (isExpanded && isTargeted) {
         this.setState({
           isTargeted: false,
+        })
+      }
+    } else { // targeted
+      if (isExpanded && !isTargeted) {
+        this.setState({
+          isTargeted: true,
         })
       }
     }
@@ -369,6 +385,7 @@ class Bubble extends React.Component {
       children,
       radius,
       origin,
+      backgroundColor: forcedBackgroundColor,
     } = this.props
 
     const {
@@ -376,7 +393,12 @@ class Bubble extends React.Component {
     } = this.state
 
     // TODO used animation to change the color
-    const backgroundColor = isTargeted ? '#770000' : '#00ff00'
+    let backgroundColor
+    if (forcedBackgroundColor) {
+      backgroundColor = forcedBackgroundColor
+    } else {
+      backgroundColor = isTargeted ? '#AAAAAA60' : '#AAAAAA30'
+    }
 
     return (
       <Animated.View
@@ -388,7 +410,11 @@ class Bubble extends React.Component {
             width: radius * 2,
             borderRadius: radius,
             backgroundColor,
-            transform: this._translatePosition.getTranslateTransform(),
+            transform: [{
+              translateX: this._highligtedTranslatePositionX,
+            }, {
+              translateY: this._highligtedTranslatePositionY,
+            }]
           },
         ]}
       >  
