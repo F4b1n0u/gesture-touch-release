@@ -7,7 +7,7 @@ const { PanGestureHandler, LongPressGestureHandler, NativeViewGestureHandler } =
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
-const BUBBLE_RADIUS = WINDOW_WIDTH / 14
+const BUBBLE_RADIUS = WINDOW_WIDTH / 12
 const BUBBLE_SPACING = WINDOW_WIDTH / 45
 const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 4
 
@@ -192,7 +192,7 @@ class Bubble extends React.Component {
   _highligtedTranslateRatio = this._touchDistance.interpolate({
     inputRange:  [0, EXPANDED_ARC_RADIUS,             2 * EXPANDED_ARC_RADIUS],
     outputRange: [1, HIGHLIGTHED_BUBBLE_RADIUS_RATIO, 1],
-    easing: Easing.inOut(Easing.exp),
+    easing: Easing.inOut(Easing.linear),
     extrapolate: 'clamp',
     useNativeDriver: true,
   })
@@ -397,9 +397,13 @@ class Bubble extends React.Component {
     if (needPositionAnimation) {
       this._handlePosition(null, () => {
         this.setState({
-          isTargeted: false
+          isTargeted: false,
+          isSelected: false,
         }, () => {
-          this._touchDistance.setValue(0)
+          Animated.timing(this._touchDistance, {
+            toValue: 0,
+            duration: 62.5,
+          }).start()
         })
       })
     }
