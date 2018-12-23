@@ -7,12 +7,12 @@ const { PanGestureHandler, LongPressGestureHandler, NativeViewGestureHandler } =
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
-const BUBBLE_RADIUS = WINDOW_WIDTH / 15
+const BUBBLE_RADIUS = WINDOW_WIDTH / 14
 const BUBBLE_SPACING = WINDOW_WIDTH / 45
 const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 4
 
-const SELECTED_ON_RATIO = .2
-const SELECTED_OFF_RATIO = .4
+const SELECTED_ON_RATIO = 2
+const SELECTED_OFF_RATIO = 3
 
 const HIGHLIGTHED_BUBBLE_RADIUS_RATIO = 1.2
 
@@ -183,7 +183,7 @@ class Bubble extends React.Component {
 
     this.state = {
       isTargeted: false,
-      isHighligthed: false,
+      isSelected: false,
     }
   }
 
@@ -267,27 +267,6 @@ class Bubble extends React.Component {
     }
   }
 
-  _handleHighlighted = ({ x, y }) => {
-    const {
-      isTargeted,
-    } = this.state
-
-    const distance = Math.sqrt(x * x + y * y)
-    
-
-    if (isTargeted) {
-      Animated.timing(this._touchDistance, {
-        toValue: distance,
-        duration: 20,
-      }).start()
-    } else {
-      Animated.timing(this._touchDistance, {
-        toValue: 0,
-        duration: 125,
-      }).start()
-    }
-  }
-
   _getTouchAngle = ({ x, y }) => {
     let angleOffset
     let sides = (y * x) < 0 ? (
@@ -345,6 +324,69 @@ class Bubble extends React.Component {
     }
   }
 
+  _handleHighlighted = ({ x, y }) => {
+    const {
+      isTargeted,
+    } = this.state
+
+    const distance = Math.sqrt(x * x + y * y)
+
+    if (isTargeted) {
+      Animated.timing(this._touchDistance, {
+        toValue: distance,
+        duration: 20,
+        easing: Easing.inOut(Easing.linear)
+      }).start()
+    } else {
+      Animated.timing(this._touchDistance, {
+        toValue: 0,
+        duration: 125,
+      }).start()
+    }
+  }
+
+  _handleSelected = ({ x, y }) => {
+    const {
+      isExpanded,
+      origin,
+    } = this.props
+
+    const {
+      isTargeted,
+      isSelected,
+    } = this.state
+
+    if (isExpanded && isTargeted) {
+      const position = {
+        x: this._highligtedTranslatePositionX.__getValue(),
+        y: this._highligtedTranslatePositionY.__getValue(),
+      }
+  
+      const delta = {
+        x: position.x - x,
+        y: position.y - y,
+      }
+      const range = Math.sqrt(delta.x * delta.x + delta.y * delta.y)
+  
+      const isInSelectionRange = range < SELECTED_ON_RATIO * BUBBLE_RADIUS
+      const isInDeselectionRange = range > SELECTED_OFF_RATIO * BUBBLE_RADIUS
+
+      if (!isSelected && isInSelectionRange) {
+        this.setState({
+          isSelected: true
+        })
+      } else if (isInDeselectionRange) {
+        this.setState({
+          isSelected: false
+        })
+      }
+    } else {
+      this.setState({
+        isSelected: false
+      })
+    }
+  }
+
   componentWillUpdate({ isExpanded: wasExpanded }) {
     const {
       isExpanded,
@@ -369,8 +411,9 @@ class Bubble extends React.Component {
     } = this.props
 
     if (touch) {
-      touch.addListener(this._handleHighlighted)
       touch.addListener(this._handleTargeted)
+      touch.addListener(this._handleHighlighted)
+      touch.addListener(this._handleSelected)
     }
   }
 
@@ -380,8 +423,9 @@ class Bubble extends React.Component {
     } = this.props
 
     if (touch) {
-      touch.removeListener(this._handleHighlighted)
       touch.removeListener(this._handleTargeted)
+      touch.removeListener(this._handleHighlighted)
+      touch.removeListener(this._handleSelected)
     }
   }
 
@@ -394,7 +438,7 @@ class Bubble extends React.Component {
     } = this.props
 
     const {
-      isTargeted,
+      isSelected,
     } = this.state
 
     // TODO used animation to change the color
@@ -402,7 +446,7 @@ class Bubble extends React.Component {
     if (forcedBackgroundColor) {
       backgroundColor = forcedBackgroundColor
     } else {
-      backgroundColor = isTargeted ? '#FF000060' : '#AAAAAA'
+      backgroundColor = isSelected ? '#FF0000' : '#AAAAAA'
     }
 
     return (
