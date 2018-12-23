@@ -1,7 +1,8 @@
 import React from 'react'
-import { View, Text, StyleSheet, Dimensions, Easing, Animated } from 'react-native'
+import { View, Text, StyleSheet, Dimensions, Easing, Animated, LayoutAnimation } from 'react-native'
 import { GestureHandler } from 'expo'
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback'
+import Color from 'color'
 
 const { PanGestureHandler, LongPressGestureHandler, NativeViewGestureHandler } = GestureHandler
 
@@ -15,6 +16,9 @@ const SELECTED_ON_RATIO = 2
 const SELECTED_OFF_RATIO = 3
 
 const HIGHLIGTHED_BUBBLE_RADIUS_RATIO = 1.2
+
+const REGULAR_COLOR = Color('#AAAAAA')
+const SELECTED_COLOR = Color('#FF0000')
 
 const ORIGIN = {
   x: WINDOW_WIDTH / 2,
@@ -198,6 +202,17 @@ class Bubble extends React.Component {
   })
   _highligtedTranslatePositionX = Animated.multiply(this._translatePosition.x, this._highligtedTranslateRatio)
   _highligtedTranslatePositionY = Animated.multiply(this._translatePosition.y, this._highligtedTranslateRatio)
+  _selectedColorChange = new Animated.Value(0)
+  _selectColor = this._selectedColorChange.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [
+      `rgba(${REGULAR_COLOR.red()}, ${REGULAR_COLOR.green()}, ${REGULAR_COLOR.blue()}, 1)`,
+      `rgba(${SELECTED_COLOR.red()}, ${SELECTED_COLOR.green()}, ${SELECTED_COLOR.blue()}, 1)`,
+    ],
+    easing: Easing.inOut(Easing.linear),
+    extrapolate: 'clamp',
+    useNativeDriver: true,
+  })
 
   _getAngleRotation = () => {
     const {
@@ -241,7 +256,7 @@ class Bubble extends React.Component {
     if (!isExpanded) {
       const expandedDistance = this._getExpandedDistance()
       const offsetAngle = this._getOffsetAngle()
-
+      
       // duration shoudl depend on how far we already 
       Animated.parallel([
         Animated.timing(this._translatePosition.x, {
@@ -252,7 +267,7 @@ class Bubble extends React.Component {
           toValue: - Math.sin(offsetAngle) * expandedDistance,
           duration: 125,
         })
-      ]).start(onExpanded)      
+      ]).start(onExpanded)
     } else {
       Animated.parallel([
         Animated.timing(this._translatePosition.x, {
@@ -332,23 +347,42 @@ class Bubble extends React.Component {
     const distance = Math.sqrt(x * x + y * y)
 
     if (isTargeted) {
-      Animated.timing(this._touchDistance, {
-        toValue: distance,
-        duration: 20,
-        easing: Easing.inOut(Easing.linear)
-      }).start()
+      this._touchDistance.setValue(distance)
     } else {
       Animated.timing(this._touchDistance, {
         toValue: 0,
-        duration: 125,
+        duration: 30,
       }).start()
     }
+  }
+  
+  _select = () => {
+    this.setState({
+      isSelected: true
+    }, () => {
+      Animated.timing(this._selectedColorChange, {
+        toValue: 1,
+        duration: 75,
+      }).start(() => {
+        // ReactNativeHapticFeedback.trigger('impactMedium')
+      })
+    })
+  }
+
+  _deselect = () => {
+    this.setState({
+      isSelected: false
+    }, () => {
+      Animated.timing(this._selectedColorChange, {
+        toValue: 0,
+        duration: 20,
+      }).start()
+    })
   }
 
   _handleSelected = ({ x, y }) => {
     const {
       isExpanded,
-      origin,
     } = this.props
 
     const {
@@ -372,40 +406,38 @@ class Bubble extends React.Component {
       const isInDeselectionRange = range > SELECTED_OFF_RATIO * BUBBLE_RADIUS
 
       if (!isSelected && isInSelectionRange) {
-        this.setState({
-          isSelected: true
-        })
+        this._select()
       } else if (isInDeselectionRange) {
-        this.setState({
-          isSelected: false
-        })
+        this._deselect()
       }
     } else {
-      this.setState({
-        isSelected: false
-      })
+      this._deselect()
     }
   }
 
   componentWillUpdate({ isExpanded: wasExpanded }) {
     const {
-      isExpanded,
+      isExpanded: willExpand,
     } = this.props
 
-    const needPositionAnimation = wasExpanded !== isExpanded
-    
+    const needPositionAnimation = wasExpanded !== willExpand
+
     if (needPositionAnimation) {
-      this._handlePosition(null, () => {
-        this.setState({
-          isTargeted: false,
-          isSelected: false,
-        }, () => {
-          Animated.timing(this._touchDistance, {
-            toValue: 0,
-            duration: 62.5,
-          }).start()
-        })
-      })
+      this._handlePosition(
+        null,
+        () => {
+          this.setState({
+            isTargeted: false,
+          }, () => {
+            this._deselect()
+
+            Animated.timing(this._touchDistance, {
+              toValue: 0,
+              duration: 62.5,
+            }).start()
+          })
+        }
+      )
     }
   }
 
@@ -441,16 +473,11 @@ class Bubble extends React.Component {
       backgroundColor: forcedBackgroundColor,
     } = this.props
 
-    const {
-      isSelected,
-    } = this.state
-
     // TODO used animation to change the color
-    let backgroundColor
     if (forcedBackgroundColor) {
       backgroundColor = forcedBackgroundColor
     } else {
-      backgroundColor = isSelected ? '#FF0000' : '#AAAAAA'
+      backgroundColor = this._selectColor
     }
 
     return (
@@ -462,7 +489,7 @@ class Bubble extends React.Component {
             left: origin.x - radius,
             width: radius * 2,
             borderRadius: radius,
-            backgroundColor,
+            backgroundColor: this._selectColor,
             transform: [{
               translateX: this._highligtedTranslatePositionX,
             }, {
