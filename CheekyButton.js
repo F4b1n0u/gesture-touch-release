@@ -7,9 +7,9 @@ const { PanGestureHandler, LongPressGestureHandler, NativeViewGestureHandler } =
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
-const BUBBLE_RADIUS = WINDOW_WIDTH / 10
-const BUBBLE_SPACING = WINDOW_WIDTH / 35
-const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 3
+const BUBBLE_RADIUS = WINDOW_WIDTH / 15
+const BUBBLE_SPACING = WINDOW_WIDTH / 45
+const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 4
 
 const SELECTED_ON_RATIO = .2
 const SELECTED_OFF_RATIO = .4
@@ -58,9 +58,9 @@ class CheekyButton extends React.Component {
       {
         label: 'D',
       },
-      {
-        label: 'E',
-      },
+      // {
+      //   label: 'E',
+      // },
       // {
       //   label: 'F',
       // },
@@ -188,11 +188,11 @@ class Bubble extends React.Component {
   }
 
   _translatePosition = new Animated.ValueXY({ x: 0, y: 0 })
-  _touchDistance = new Animated.Value(EXPANDED_ARC_RADIUS)
+  _touchDistance = new Animated.Value(0)
   _highligtedTranslateRatio = this._touchDistance.interpolate({
     inputRange:  [0, EXPANDED_ARC_RADIUS,             2 * EXPANDED_ARC_RADIUS],
     outputRange: [1, HIGHLIGTHED_BUBBLE_RADIUS_RATIO, 1],
-    easing: Easing.inOut(Easing.linear),
+    easing: Easing.inOut(Easing.exp),
     extrapolate: 'clamp',
     useNativeDriver: true,
   })
@@ -276,10 +276,13 @@ class Bubble extends React.Component {
     
 
     if (isTargeted) {
-      this._touchDistance.setValue(distance)
+      Animated.timing(this._touchDistance, {
+        toValue: distance,
+        duration: 20,
+      }).start()
     } else {
       Animated.timing(this._touchDistance, {
-        toValue: EXPANDED_ARC_RADIUS,
+        toValue: 0,
         duration: 125,
       }).start()
     }
@@ -353,6 +356,8 @@ class Bubble extends React.Component {
       this._handlePosition(null, () => {
         this.setState({
           isTargeted: false
+        }, () => {
+          this._touchDistance.setValue(0)
         })
       })
     }
@@ -397,7 +402,7 @@ class Bubble extends React.Component {
     if (forcedBackgroundColor) {
       backgroundColor = forcedBackgroundColor
     } else {
-      backgroundColor = isTargeted ? '#AAAAAA60' : '#AAAAAA30'
+      backgroundColor = isTargeted ? '#FF000060' : '#AAAAAA'
     }
 
     return (
@@ -414,6 +419,8 @@ class Bubble extends React.Component {
               translateX: this._highligtedTranslatePositionX,
             }, {
               translateY: this._highligtedTranslatePositionY,
+            }, {
+              scale: this._highligtedTranslateRatio,
             }]
           },
         ]}
