@@ -249,6 +249,7 @@ class Bubble extends React.Component {
             set(angleOffset, 3 * Math.PI / 2),
           )
         ),
+        // THIS LINE MAKE THE CODE CRASH
         add(atan(abs(sides)), angleOffset),
       ])
     ])
@@ -270,29 +271,6 @@ class Bubble extends React.Component {
         multiply(expandY, highligtedTranslateRatio),
         expandY,
     )
-
-    this._from = new Value(0)
-    this._to = new Value(0)
-    this._angle = new Value(0)
-    
-    
-
-    // function isInRange({ from, to, angle }) {
-    //   var _from  = from  % (2 * Math.PI),
-    //       _to    = to    % (2 * Math.PI),
-    //       _angle = angle % (2 * Math.PI);
-    //   if (_from  < 0) _from  += (2 * Math.PI);
-    //   if (_to    < 0) _to    += (2 * Math.PI);
-    //   if (_angle < 0) _angle += (2 * Math.PI);
-    //   if (_from === _to) {
-    //       if (to > from)
-    //           return true; // whole circle
-    //       return _angle === _from; // exact only
-    //       if (_to < _from)
-    //       return _angle <= _to || from <= _angle;
-    //   return _from <= _angle && _angle <= _to;
-    //   }
-    // }
   }
 
   _getAngleRotation = () => {
