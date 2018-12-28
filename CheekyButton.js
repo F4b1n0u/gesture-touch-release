@@ -7,37 +7,48 @@ import Animated, { Easing } from 'react-native-reanimated'
 
 const { View, Text, StyleSheet, Dimensions } = RN
 const {
+  abs,
+  add,
+  and,
+  atan,
+  block,
   Clock,
   cond,
+  debug,
   eq,
   event,
+  Extrapolate,
   interpolate,
+  lessThan,
   multiply,
+  neq,
   set,
   startClock,
   stopClock,
   timing,
   Value,
-  block,
-  and,
-  neq,
-  Extrapolate,
+  sqrt,
+  greaterThan,
 } = Animated;
 
-const { PanGestureHandler, LongPressGestureHandler, NativeViewGestureHandler, State } = GestureHandler
+const { PanGestureHandler, LongPressGestureHandler, State } = GestureHandler
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
 const BUBBLE_RADIUS = WINDOW_WIDTH / 12
 const BUBBLE_SPACING = WINDOW_WIDTH / 45
 const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 4
+const HIGHLIGTHED_BUBBLE_RADIUS_RATIO = 1.2
+const LONG_PRESS_DURATION = 250
 
 const ORIGIN = {
   x: WINDOW_WIDTH / 2,
   y: WINDOW_HEIGHT / 2,
 }
 
-function runExpansion(clock, expansionState) {
+function runExpansion(expansionState) {
+  const clock = new Clock()
+
   const state = {
     finished: new Value(0),
     position: new Value(0),
@@ -47,7 +58,7 @@ function runExpansion(clock, expansionState) {
 
   const config = {
     toValue: new Value(0),
-    duration: new Value(0),
+    duration: new Value(125),
     easing: Easing.inOut(Easing.ease),
   }
 
@@ -56,7 +67,6 @@ function runExpansion(clock, expansionState) {
       set(state.finished, 0),
       set(state.time, 0),
       set(state.frameTime, 0),
-      set(config.duration, 250),
       set(config.toValue, 1),
       startClock(clock),
     ]),
@@ -64,7 +74,6 @@ function runExpansion(clock, expansionState) {
       set(state.finished, 0),
       set(state.time, 0),
       set(state.frameTime, 0),
-      set(config.duration, 125),
       set(config.toValue, 0),
       startClock(clock),
     ]),
@@ -83,27 +92,15 @@ class CheekyButton extends React.Component {
       {
         label: 'A',
       },
-      // {
-      //   label: 'B',
-      // },
-      // {
-      //   label: 'C',
-      // },
-      // {
-      //   label: 'D',
-      // },
-      // {
-      //   label: 'E',
-      // },
-      // {
-      //   label: 'F',
-      // },
-      // {
-      //   label: 'G',
-      // },
-      // {
-      //   label: 'H',
-      // }
+      {
+        label: 'B',
+      },
+      {
+        label: 'C',
+      },
+      {
+        label: 'D',
+      },
     ]}
   }
 
@@ -117,16 +114,13 @@ class CheekyButton extends React.Component {
       translationY: this._touchY,
     }
   }])
-  _expansionClock = new Clock()
-  _expansionState = new Value(-1)
-  _expansion = runExpansion(this._expansionClock, this._expansionState)
+  _longPressState = new Value(State.UNDEFINED)
+  _expansion = runExpansion(this._longPressState)
   _onLongPressStateChange = event([{
     nativeEvent: {
-      state: this._expansionState,
+      state: this._longPressState,
     }
-  }], {
-    useNativeDriver: true,
-  })
+  }])
   
   render() {
     const {
@@ -158,6 +152,7 @@ class CheekyButton extends React.Component {
         ))}
         <LongPressGestureHandler
           ref={this._longPressRef}
+          minDurationMs={LONG_PRESS_DURATION}
           onHandlerStateChange={this._onLongPressStateChange}
         >
           <Animated.View>
@@ -207,19 +202,97 @@ class Bubble extends React.Component {
       isTargeted: false,
       isSelected: false,
     }
+    const {
+      touch: {
+        x: touchX,
+        y: touchY,
+      }
+    } = props
 
     const offsetAngle = this._getOffsetAngle()
     const cos = + Math.cos(offsetAngle)
     const sin = - Math.sin(offsetAngle)
-    const distance = interpolate(
+    const expansionDistance = interpolate(
       props.expansion, {
       inputRange:  [0, 1],
       outputRange: [0, EXPANDED_ARC_RADIUS],
       easing: Easing.inOut(Easing.linear),
       extrapolate: Extrapolate.clamp,
     })
-    this._translatePositionX = multiply(cos, distance)
-    this._translatePositionY = multiply(sin, distance)
+    const expandX = multiply(cos, expansionDistance)
+    const expandY = multiply(sin, expansionDistance)
+  
+    const touchDistance = sqrt(add(multiply(touchX, touchX), multiply(touchY, touchY)))
+    const highligtedTranslateRatio = interpolate(
+      touchDistance, {
+      inputRange:  [0, EXPANDED_ARC_RADIUS,             2 * EXPANDED_ARC_RADIUS],
+      outputRange: [1, HIGHLIGTHED_BUBBLE_RADIUS_RATIO, 1],
+      easing: Easing.inOut(Easing.linear),
+      extrapolate: 'clamp',
+    })
+
+    const angleOffset = new Value(0)
+    const sides = new Value(0)
+    const targetedAngle = block([
+      cond(eq(props.expansion, 1), [
+        cond(lessThan(multiply(touchX, touchY), 0),
+          set(sides, touchY / touchX),
+          set(sides, touchX / touchY),
+        ),
+        cond(lessThan(touchX, 0),
+          cond(lessThan(touchY, 0),
+            set(angleOffset, Math.PI / 2),
+            set(angleOffset, Math.PI),
+          ),
+          cond(lessThan(touchY, 0),
+            set(angleOffset, 0),
+            set(angleOffset, 3 * Math.PI / 2),
+          )
+        ),
+        add(atan(abs(sides)), angleOffset),
+      ])
+    ])
+
+    this._targetedState = cond(
+      eq(targetedAngle, 1),
+        new Value(1),
+        new Value(0),
+    )
+
+    this._translateX = cond(
+      eq(this._targetedState, 1),
+        multiply(expandX, highligtedTranslateRatio),
+        expandX,
+    )
+
+    this._translateY = cond(
+      eq(this._targetedState, 1),
+        multiply(expandY, highligtedTranslateRatio),
+        expandY,
+    )
+
+    this._from = new Value(0)
+    this._to = new Value(0)
+    this._angle = new Value(0)
+    
+    
+
+    // function isInRange({ from, to, angle }) {
+    //   var _from  = from  % (2 * Math.PI),
+    //       _to    = to    % (2 * Math.PI),
+    //       _angle = angle % (2 * Math.PI);
+    //   if (_from  < 0) _from  += (2 * Math.PI);
+    //   if (_to    < 0) _to    += (2 * Math.PI);
+    //   if (_angle < 0) _angle += (2 * Math.PI);
+    //   if (_from === _to) {
+    //       if (to > from)
+    //           return true; // whole circle
+    //       return _angle === _from; // exact only
+    //       if (_to < _from)
+    //       return _angle <= _to || from <= _angle;
+    //   return _from <= _angle && _angle <= _to;
+    //   }
+    // }
   }
 
   _getAngleRotation = () => {
@@ -276,10 +349,9 @@ class Bubble extends React.Component {
               borderRadius: radius,
               backgroundColor: backgroundColor,
               transform: [{
-                translateX: this._translatePositionX && this._translatePositionX,
-              }, {
-                translateY: this._translatePositionY && this._translatePositionY,
-              }]
+                translateX: this._translateX,
+                translateY: this._translateY,
+              }],
             },
           ]}
         >  
@@ -298,6 +370,10 @@ Bubble.defaultProps = {
   position: 0,
   bubbleQuantity: 0,
   expansion: new Value(0),
+  touch: {
+    x: new Value(0),
+    y: new Value(0),
+  }
 }
 
 export default CheekyButton
