@@ -38,9 +38,15 @@ const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
 const BUBBLE_RADIUS = WINDOW_WIDTH / 12
 const BUBBLE_SPACING = WINDOW_WIDTH / 45
-const EXPANDED_ARC_RADIUS =  WINDOW_WIDTH / 4
-const HIGHLIGTHED_BUBBLE_RADIUS_RATIO = 1.2
+// TODO implement this !
+const DEADZONE_ARC_RADIUS = BUBBLE_RADIUS
+const EXPANDED_ARC_RADIUS = WINDOW_WIDTH / 4
+const HIGHLIGTHED_ARC_RADIUS = 1.4
+const HIGHLIGTHED_SCALE = 1.4
+
+
 const LONG_PRESS_DURATION = 250
+const LONG_PRESS_MAX_DIST = 20
 
 const ORIGIN = {
   x: WINDOW_WIDTH / 2,
@@ -154,6 +160,7 @@ class CheekyButton extends React.Component {
         <LongPressGestureHandler
           ref={this._longPressRef}
           minDurationMs={LONG_PRESS_DURATION}
+          maxDist={LONG_PRESS_MAX_DIST}
           onHandlerStateChange={this._onLongPressStateChange}
         >
           <Animated.View>
@@ -227,12 +234,19 @@ class Bubble extends React.Component {
     )
     const highligtedTranslateRatio = interpolate(
       touchDistance, {
-      inputRange:  [0, EXPANDED_ARC_RADIUS,             2 * EXPANDED_ARC_RADIUS],
-      outputRange: [1, HIGHLIGTHED_BUBBLE_RADIUS_RATIO, 1],
+      inputRange:  [0, EXPANDED_ARC_RADIUS, 2 * EXPANDED_ARC_RADIUS],
+      outputRange: [1, HIGHLIGTHED_ARC_RADIUS, 1],
       easing: Easing.inOut(Easing.linear),
-      extrapolate: 'clamp',
+      extrapolate: Extrapolate.clamp,
     })
-
+    const highligtedScaleRatio = interpolate(
+      touchDistance, {
+      inputRange:  [0, EXPANDED_ARC_RADIUS, 2 * EXPANDED_ARC_RADIUS],
+      outputRange: [1, HIGHLIGTHED_SCALE, 1],
+      easing: Easing.inOut(Easing.linear),
+      extrapolate: Extrapolate.clamp,
+    })
+   
     const angleOffset = new Value(0)
     const sides = new Value(0)
     const targetedAngle = block([
@@ -345,6 +359,11 @@ class Bubble extends React.Component {
       multiply(expandY, highligtedTranslateRatio),
       expandY,
     )
+
+    this._scale = cond(isTargeted,
+      highligtedScaleRatio,
+      1
+    )
   }
 
   _getAngleRotation = () => {
@@ -403,6 +422,7 @@ class Bubble extends React.Component {
               transform: [{
                 translateX: this._translateX,
                 translateY: this._translateY,
+                scale: this._scale,
               }],
             },
           ]}
