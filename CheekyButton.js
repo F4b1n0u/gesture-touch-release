@@ -1,34 +1,35 @@
 import React from 'react'
-import RN from 'react-native'
+import { View, Text, StyleSheet, Dimensions } from 'react-native'
 import { GestureHandler } from 'expo'
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback'
-import Color from 'color'
 import Animated, { Easing } from 'react-native-reanimated'
 
-const { View, Text, StyleSheet, Dimensions } = RN
 const {
   abs,
+  or,
   add,
   and,
   atan,
   block,
   Clock,
   cond,
-  debug,
+  divide,
   eq,
   event,
   Extrapolate,
   interpolate,
+  lessOrEq,
   lessThan,
   multiply,
   neq,
   set,
+  sqrt,
   startClock,
   stopClock,
   timing,
   Value,
-  sqrt,
+  modulo,
   greaterThan,
+  sub,
 } = Animated;
 
 const { PanGestureHandler, LongPressGestureHandler, State } = GestureHandler
@@ -231,33 +232,83 @@ class Bubble extends React.Component {
       extrapolate: 'clamp',
     })
 
+    const expansionState = lessThan(props.expansion, 1)
+
     const angleOffset = new Value(0)
     const sides = new Value(0)
     const targetedAngle = block([
       cond(eq(props.expansion, 1), [
-        cond(lessThan(multiply(touchX, touchY), 0),
-          set(sides, touchY / touchX),
-          set(sides, touchX / touchY),
+        cond(eq(multiply(touchX, touchY), 0),
+          set(sides, 0),
+          cond(lessThan(multiply(touchX, touchY), 0),
+            set(sides, divide(touchY, touchX)),
+            set(sides, divide(touchX, touchY)),
+          )
         ),
-        cond(lessThan(touchX, 0),
-          cond(lessThan(touchY, 0),
+        cond(lessOrEq(touchX, 0),
+          cond(lessOrEq(touchY, 0),
             set(angleOffset, Math.PI / 2),
             set(angleOffset, Math.PI),
           ),
-          cond(lessThan(touchY, 0),
+          cond(lessOrEq(touchY, 0),
             set(angleOffset, 0),
             set(angleOffset, 3 * Math.PI / 2),
           )
         ),
-        // THIS LINE MAKE THE CODE CRASH
-        add(atan(abs(sides)), angleOffset),
+        add(atan(abs(sides)), angleOffset)
       ])
     ])
-
+    
+    const angle = this._getAngle()
+    const minAngle = - angle / 2
+    const maxAngle = + angle / 2
+    const from = new Value(minAngle)
+    const to = new Value(maxAngle)
+    
+    const relativeAngle = new Value(0)
     this._targetedState = cond(
-      eq(targetedAngle, 1),
-        new Value(1),
-        new Value(0),
+      eq(props.expansion, 1),
+        [
+          set(relativeAngle, sub(targetedAngle, offsetAngle)),
+          cond(
+            eq(block([
+              set(from, modulo(from, 2 * Math.PI)),
+              set(to, modulo(to, 2 * Math.PI)),
+              set(to, modulo(to, 2 * Math.PI)),
+              cond(lessThan(from, 0),
+                add(from, 2 * Math.PI),
+              ),
+              cond(lessThan(to, 0),
+                add(to, 2 * Math.PI),
+              ),
+              cond(lessThan(relativeAngle, 0),
+                add(relativeAngle, 2 * Math.PI),
+              ),
+              cond(eq(from, to),
+                cond(greaterThan(to, from),
+                  true,
+                ),
+                eq(relativeAngle, from),
+              ),
+              cond(lessThan(to, from),
+                or(
+                  lessOrEq(relativeAngle, to),
+                  lessOrEq(from, relativeAngle),
+                )
+                ,
+                and(
+                  lessOrEq(from, relativeAngle),
+                  lessOrEq(relativeAngle, to),
+                )
+              ),
+            ]), true),
+              cond(this.targetedState,
+                false,
+                true,
+              ),
+          )
+        ],
+        false,
     )
 
     this._translateX = cond(
