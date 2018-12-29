@@ -47,7 +47,7 @@ const ORIGIN = {
   y: WINDOW_HEIGHT / 2,
 }
 
-function runExpansion(expansionState) {
+function runExpansion(longPressState) {
   const clock = new Clock()
 
   const state = {
@@ -64,14 +64,14 @@ function runExpansion(expansionState) {
   }
 
   return block([
-    cond(and(eq(expansionState, State.ACTIVE), neq(config.toValue, 1)), [
+    cond(and(eq(longPressState, State.ACTIVE), neq(config.toValue, 1)), [
       set(state.finished, 0),
       set(state.time, 0),
       set(state.frameTime, 0),
       set(config.toValue, 1),
       startClock(clock),
     ]),
-    cond(and(eq(expansionState, State.END), neq(config.toValue, 0)), [
+    cond(and(eq(longPressState, State.END), neq(config.toValue, 0)), [
       set(state.finished, 0),
       set(state.time, 0),
       set(state.frameTime, 0),
@@ -199,10 +199,6 @@ class Bubble extends React.Component {
   constructor(props) {
     super(props)
 
-    this.state = {
-      isTargeted: false,
-      isSelected: false,
-    }
     const {
       touch: {
         x: touchX,
@@ -223,7 +219,12 @@ class Bubble extends React.Component {
     const expandX = multiply(cos, expansionDistance)
     const expandY = multiply(sin, expansionDistance)
   
-    const touchDistance = sqrt(add(multiply(touchX, touchX), multiply(touchY, touchY)))
+    const isExpanded = greaterThan(props.expansion, 0)
+    const touchDistance = cond(isExpanded,
+      sqrt(add(multiply(touchX, touchX), multiply(touchY, touchY))),
+      // TODO check why it is not reseted to 0
+      0
+    )
     const highligtedTranslateRatio = interpolate(
       touchDistance, {
       inputRange:  [0, EXPANDED_ARC_RADIUS,             2 * EXPANDED_ARC_RADIUS],
@@ -232,12 +233,10 @@ class Bubble extends React.Component {
       extrapolate: 'clamp',
     })
 
-    const expansionState = lessThan(props.expansion, 1)
-
     const angleOffset = new Value(0)
     const sides = new Value(0)
     const targetedAngle = block([
-      cond(eq(props.expansion, 1), [
+      cond(isExpanded, [
         cond(eq(multiply(touchX, touchY), 0),
           set(sides, 0),
           cond(lessThan(multiply(touchX, touchY), 0),
@@ -259,68 +258,92 @@ class Bubble extends React.Component {
       ])
     ])
     
-    const angle = this._getAngle()
-    const minAngle = - angle / 2
-    const maxAngle = + angle / 2
-    const from = new Value(minAngle)
-    const to = new Value(maxAngle)
+    //     from: + angle / 2,
+    //     to: - angle / 2,
+    //     angle: relativeAngle,
     
-    const relativeAngle = new Value(0)
-    this._targetedState = cond(
-      eq(props.expansion, 1),
+    //   var _from  = from  % (2 * Math.PI),
+    //       _to    = to    % (2 * Math.PI),
+    //       _angle = angle % (2 * Math.PI);
+    const angle = this._getAngle()
+    const minAngle = (+ angle / 2) % (2 * Math.PI)
+    const maxAngle = (- angle / 2) % (2 * Math.PI)
+    const from = new Value(maxAngle)
+    const to = new Value(minAngle)
+    const relativeAngle = modulo(sub(targetedAngle, offsetAngle), (2 * Math.PI))
+
+    const isInRange = block([
+      //   if (_from  < 0) _from  += (2 * Math.PI); // (-500) % (2 * Math.PI) === -140 :(
+      //   if (_to    < 0) _to    += (2 * Math.PI);
+      //   if (_angle < 0) _angle += (2 * Math.PI);
+      cond(lessThan(from, 0),           set(from,           add(from, (2 * Math.PI)))),
+      cond(lessThan(to, 0),             set(to,             add(to, (2 * Math.PI)))),
+      cond(lessThan(relativeAngle, 0),  set(relativeAngle,  add(relativeAngle, (2 * Math.PI)))),
+    
+      //   if (_from === _to) {
+      //     if (to > from)
+      //       return true; // whole circle
+      //     return _angle === _from; // exact only
+      //   } else {
+      //     if (_to < _from)
+      //       return _angle <= _to || from <= _angle; // _angle outside range
+      //     return _from <= _angle && _angle <= _to; 
+      //   }
+
+      cond(eq(from, to),
         [
-          set(relativeAngle, sub(targetedAngle, offsetAngle)),
-          cond(
-            eq(block([
-              set(from, modulo(from, 2 * Math.PI)),
-              set(to, modulo(to, 2 * Math.PI)),
-              set(to, modulo(to, 2 * Math.PI)),
-              cond(lessThan(from, 0),
-                add(from, 2 * Math.PI),
-              ),
-              cond(lessThan(to, 0),
-                add(to, 2 * Math.PI),
-              ),
-              cond(lessThan(relativeAngle, 0),
-                add(relativeAngle, 2 * Math.PI),
-              ),
-              cond(eq(from, to),
-                cond(greaterThan(to, from),
-                  true,
-                ),
-                eq(relativeAngle, from),
-              ),
-              cond(lessThan(to, from),
-                or(
-                  lessOrEq(relativeAngle, to),
-                  lessOrEq(from, relativeAngle),
-                )
-                ,
-                and(
-                  lessOrEq(from, relativeAngle),
-                  lessOrEq(relativeAngle, to),
-                )
-              ),
-            ]), true),
-              cond(this.targetedState,
-                false,
-                true,
-              ),
-          )
+          cond(greaterThan(to, from),
+            true,
+          ),
+          eq(relativeAngle, from),
         ],
+        cond(lessThan(to, from),
+          or(
+            lessOrEq(relativeAngle, to),
+            lessOrEq(from, relativeAngle),
+          )
+          ,
+          and(
+            lessOrEq(from, relativeAngle),
+            lessOrEq(relativeAngle, to),
+          )
+        ),
+      ),
+    ])
+
+    //   if (isInRange({
+    
+    //   }) && isExpanded) { // not targeted
+    //     if (isTargeted) {
+    //       this.setState({
+    //         isTargeted: false,
+    //       })
+    //     }
+    //   } else { // targeted
+    //     if (!isTargeted) {
+    //       this.setState({
+    //         isTargeted: true,
+    //       })
+    //     }
+    //   }
+    // }
+
+    const isTargeted = cond(and(isExpanded, isInRange),
+      cond(this.targetedState,
         false,
+        true,
+      ),
+      false,
     )
 
-    this._translateX = cond(
-      eq(this._targetedState, 1),
-        multiply(expandX, highligtedTranslateRatio),
-        expandX,
+    this._translateX = cond(isTargeted,
+      multiply(expandX, highligtedTranslateRatio),
+      expandX,
     )
 
-    this._translateY = cond(
-      eq(this._targetedState, 1),
-        multiply(expandY, highligtedTranslateRatio),
-        expandY,
+    this._translateY = cond(isTargeted,
+      multiply(expandY, highligtedTranslateRatio),
+      expandY,
     )
   }
 
