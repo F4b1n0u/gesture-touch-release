@@ -14,6 +14,7 @@ const {
   color,
   cond,
   divide,
+  round,
   eq,
   event,
   greaterThan,
@@ -48,7 +49,7 @@ const EXPANDED_ARC_RADIUS = WINDOW_WIDTH / 4
 const HIGHLIGTHED_ARC_RADIUS = 1.4
 const HIGHLIGTHED_SCALE = 1.4
 
-const SELECTION_RATIO = 1.5
+const SELECTION_RATIO = 1.8
 const DESELECTION_RATIO = 2
 
 const LONG_PRESS_DURATION = 250
@@ -57,6 +58,50 @@ const LONG_PRESS_MAX_DIST = 20
 const ORIGIN = {
   x: WINDOW_WIDTH / 2,
   y: WINDOW_HEIGHT / 2,
+}
+
+function match(condsAndResPairs, offset = 0) {
+  if (condsAndResPairs.length - offset === 1) {
+    return condsAndResPairs[offset];
+  } else if (condsAndResPairs.length - offset === 0) {
+    return undefined;
+  }
+  return cond(
+    condsAndResPairs[offset],
+    condsAndResPairs[offset + 1],
+    match(condsAndResPairs, offset + 2)
+  );
+}
+
+function colorHSV(h /* 0 - 360 */, s /* 0 - 1 */, v /* 0 - 1 */) {
+  // Converts color from HSV format into RGB
+  // Formula explained here: https://www.rapidtables.com/convert/color/hsv-to-rgb.html
+  const c = multiply(v, s);
+  const hh = divide(h, 60);
+  const x = multiply(c, sub(1, abs(sub(modulo(hh, 2), 1))));
+
+  const m = sub(v, c);
+
+  const colorRGB = (r, g, b) =>
+    color(
+      round(multiply(255, add(r, m))),
+      round(multiply(255, add(g, m))),
+      round(multiply(255, add(b, m)))
+    );
+
+  return match([
+    lessThan(h, 60),
+    colorRGB(c, x, 0),
+    lessThan(h, 120),
+    colorRGB(x, c, 0),
+    lessThan(h, 180),
+    colorRGB(0, c, x),
+    lessThan(h, 240),
+    colorRGB(0, x, c),
+    lessThan(h, 300),
+    colorRGB(x, 0, c),
+    colorRGB(c, 0, x) /* else */,
+  ]);
 }
 
 function runExpansion(longPressState) {
@@ -143,10 +188,41 @@ function runDistance(isTargeted, { x: touchX, y: touchY }) {
 }
 
 function runBackgroundColor(isSelected) {
-  return cond(isSelected,
-    color(255, 0, 0, .5),
-    color(255, 0, 0, 1)
-  )
+  const clock = new Clock()
+
+  const state = {
+    finished: new Value(0),
+    position: new Value(0),
+    frameTime: new Value(0),
+    time: new Value(0),
+  }
+
+  const config = {
+    toValue: new Value(0),
+    duration: new Value(100),
+    easing: Easing.in(Easing.ease),
+  }
+
+  return block([
+    cond(and(isSelected, neq(config.toValue, .5)), [
+      set(state.finished, 0),
+      set(state.time, 0),
+      set(state.frameTime, 0),
+      set(config.toValue, .5),
+      startClock(clock),
+    ]),
+    cond(and(not(isSelected), neq(config.toValue, 0)), [
+      set(state.finished, 0),
+      set(state.time, 0),
+      set(state.frameTime, 0),
+      set(config.toValue, 0),
+      startClock(clock),
+    ]),
+    timing(clock, state, config),
+    cond(state.finished, stopClock(clock)),
+
+    colorHSV(.5, add(state.position, .5), .5, 1),
+  ])
 }
 
 class CheekyButton extends React.Component {
@@ -158,15 +234,15 @@ class CheekyButton extends React.Component {
       {
         label: 'A',
       },
-      // {
-      //   label: 'B',
-      // },
-      // {
-      //   label: 'C',
-      // },
-      // {
-      //   label: 'D',
-      // },
+      {
+        label: 'B',
+      },
+      {
+        label: 'C',
+      },
+      {
+        label: 'D',
+      },
     ]}
   }
 
@@ -380,29 +456,26 @@ class Bubble extends React.Component {
     const deltaX = sub(expandX, touchX)
     const deltaY = sub(expandY, touchY)
     
-    let range = debug('range',
-      sqrt(add(multiply(deltaX, deltaX), multiply(deltaY, deltaY)))
-    )
-    let isInSelectionRange = debug('isInSelectionRange',
-      lessThan(range, SELECTION_RATIO * BUBBLE_RADIUS)
-    )
-    let isInDeselectionRange = debug('isInDeselectionRange',
-      greaterThan(range, DESELECTION_RATIO * BUBBLE_RADIUS)
-    )
+    let range = sqrt(add(multiply(deltaX, deltaX), multiply(deltaY, deltaY)))
+    let isInSelectionRange = and(isTargeted, lessThan(range, SELECTION_RATIO * BUBBLE_RADIUS))
+    let isInDeselectionRange = and(isTargeted, greaterThan(range, DESELECTION_RATIO * BUBBLE_RADIUS))
 
-    let isSelected = debug('isSelected',
-      cond(isTargeted,
-        [
-          cond(isInSelectionRange,
-            1,
-          ),
-          cond(isInDeselectionRange,
-            0,
-          )
-        ],
-      0,
-      )
-    )
+    let isSelected = new Value(0)
+
+    isSelected = block([
+      cond(isTargeted, [
+        onChange(isInDeselectionRange,
+          cond(isInDeselectionRange, set(isSelected, 0))
+        ),
+        onChange(isInSelectionRange,
+          cond(isInSelectionRange, set(isSelected, 1))
+        ),
+      ]),
+      onChange(isTargeted,
+        set(isSelected, and(isTargeted, isInSelectionRange))
+      ),
+      isSelected,
+    ])
 
     this._backgroundColor = runBackgroundColor(isSelected)
   }
