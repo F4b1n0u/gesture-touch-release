@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native'
 import { GestureHandler } from 'expo'
 import Animated, { Easing } from 'react-native-reanimated'
 import SuperColor from 'color'
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback'
 
 const {
   abs,
@@ -15,6 +16,7 @@ const {
   color: animatedColor,
   cond,
   divide,
+  call,
   round,
   eq,
   event,
@@ -58,7 +60,7 @@ const LONG_PRESS_DURATION = 250
 const LONG_PRESS_MAX_DIST = 20
 
 const ORIGIN = {
-  x: WINDOW_WIDTH / 2,
+  x: 2 * WINDOW_WIDTH / 3,
   y: WINDOW_HEIGHT / 2,
 }
 
@@ -260,7 +262,17 @@ class CheekyButton extends React.Component {
     }
   }])
   _longPressState = new Value(State.UNDEFINED)
-  _expansion = runExpansion(this._longPressState)
+  _expansion = block([
+    onChange(this._longPressState,
+      cond(eq(this._longPressState, State.ACTIVE),
+        call([], () => {
+          ReactNativeHapticFeedback.trigger('impactHeavy')
+        })
+      )
+    ),
+    runExpansion(this._longPressState)
+  ])
+  
   _onLongPressStateChange = event([{
     nativeEvent: {
       state: this._longPressState,
@@ -478,6 +490,11 @@ class Bubble extends React.Component {
       onChange(isTargeted,
         set(isSelected, and(isTargeted, isInSelectionRange))
       ),
+      onChange(isSelected, 
+        cond(isSelected, call([], () => {
+          ReactNativeHapticFeedback.trigger('impactMedium')
+        }))
+      ),
       isSelected,
     ])
 
@@ -493,7 +510,7 @@ class Bubble extends React.Component {
       bubbleQuantity,
     } = this.props
     
-    return Math.PI / 2 - (this._getAngle() * (bubbleQuantity - 1)) / 2
+    return Math.PI / 2 - (this._getAngle() * (bubbleQuantity - 1)) / 2 + (Math.PI / 8)
   }
 
   _getAngle = () => {
