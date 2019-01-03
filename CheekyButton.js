@@ -2,6 +2,7 @@ import React from 'react'
 import { View, Text, StyleSheet, Dimensions } from 'react-native'
 import { GestureHandler } from 'expo'
 import Animated, { Easing } from 'react-native-reanimated'
+import SuperColor from 'color'
 
 const {
   abs,
@@ -11,7 +12,7 @@ const {
   block,
   Clock,
   clockRunning,
-  color,
+  color: animatedColor,
   cond,
   divide,
   round,
@@ -41,13 +42,14 @@ const { PanGestureHandler, LongPressGestureHandler, State } = GestureHandler
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window')
 
-const BUBBLE_RADIUS = WINDOW_WIDTH / 12
-const BUBBLE_SPACING = WINDOW_WIDTH / 45
+const BUBBLE_RADIUS = 30
+const BUBBLE_SPACING = 4
 // TODO implement this !
 const DEADZONE_ARC_RADIUS = BUBBLE_RADIUS
-const EXPANDED_ARC_RADIUS = WINDOW_WIDTH / 4
-const HIGHLIGTHED_ARC_RADIUS = 1.4
-const HIGHLIGTHED_SCALE = 1.4
+const EXPANDED_ARC_RADIUS = 100
+const HIGHLIGTHED_RATIO = 1.4
+const HIGHLIGTHED_ARC_RADIUS_RATIO = HIGHLIGTHED_RATIO
+const HIGHLIGTHED_SCALE_RATIO = HIGHLIGTHED_RATIO
 
 const SELECTION_RATIO = 1.8
 const DESELECTION_RATIO = 2
@@ -83,7 +85,7 @@ function colorHSV(h /* 0 - 360 */, s /* 0 - 1 */, v /* 0 - 1 */) {
   const m = sub(v, c);
 
   const colorRGB = (r, g, b) =>
-    color(
+  animatedColor(
       round(multiply(255, add(r, m))),
       round(multiply(255, add(g, m))),
       round(multiply(255, add(b, m)))
@@ -116,7 +118,7 @@ function runExpansion(longPressState) {
 
   const config = {
     toValue: new Value(0),
-    duration: new Value(125),
+    duration: new Value(0),
     easing: Easing.in(Easing.elastic(1)),
   }
 
@@ -153,7 +155,6 @@ function runDistance(isTargeted, { x: touchX, y: touchY }) {
     time: new Value(0),
   }
 
-
   // TODO need to check why there is this bug when you go behind and pass change isTarget
   const config = {
     toValue: new Value(0),
@@ -187,7 +188,7 @@ function runDistance(isTargeted, { x: touchX, y: touchY }) {
   ])
 }
 
-function runBackgroundColor(isSelected) {
+function runColor(isSelected, color, selectedColor) {
   const clock = new Clock()
 
   const state = {
@@ -220,8 +221,10 @@ function runBackgroundColor(isSelected) {
     ]),
     timing(clock, state, config),
     cond(state.finished, stopClock(clock)),
-
-    colorHSV(.5, add(state.position, .5), .5, 1),
+    cond(isSelected, 
+      animatedColor(...SuperColor(selectedColor).rgb().array()),
+      animatedColor(...SuperColor(color).rgb().array()),
+    ),
   ])
 }
 
@@ -278,6 +281,11 @@ class CheekyButton extends React.Component {
             expansion={this._expansion}
             radius={BUBBLE_RADIUS}
             position={position}
+            backgroundColor={'#FFFFFF'}
+            color={'#3F3F3F'}
+            isSelectable={true}
+            selectedBackgroundColor={'#DA3140'}
+            selectedColor={'#FFFFFF'}
             touch={{
               x: block([
                 // to avoid to keep the last position after released the finger
@@ -314,7 +322,8 @@ class CheekyButton extends React.Component {
                 <Bubble
                   origin={ORIGIN}
                   radius={BUBBLE_RADIUS}
-                  backgroundColor={'#AAAAAA'}
+                  backgroundColor={'#FFFFFF'}
+                  color={'#3F3F3F'}
                 >
                   <Text
                     style={styles.buttonText}
@@ -339,7 +348,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: '#FFFFFF',
     textAlign: 'center',
   }
 })
@@ -350,7 +358,11 @@ class Bubble extends React.Component {
 
     const {
       touch,
-      position,
+      backgroundColor,
+      color,
+      selectedBackgroundColor,
+      selectedColor,
+      isSelectable,
     } = props
     
     const {
@@ -370,7 +382,7 @@ class Bubble extends React.Component {
     const expandX = multiply(cos, expansionDistance)
     const expandY = multiply(sin, expansionDistance)
   
-    const isExpanded = greaterThan(props.expansion, 0)
+    const isExpanded = eq(props.expansion, 1)
   
     const angleOffset = new Value(0)
     const sides = new Value(0)
@@ -437,21 +449,15 @@ class Bubble extends React.Component {
     const highligtedTranslateRatio = interpolate(
       touchDistance, {
       inputRange:  [0, EXPANDED_ARC_RADIUS, 2 * EXPANDED_ARC_RADIUS],
-      outputRange: [1, HIGHLIGTHED_ARC_RADIUS, 1],
-      extrapolateRight: 'clamp',
+      outputRange: [1, HIGHLIGTHED_ARC_RADIUS_RATIO, 1],
+      extrapolate: 'clamp',
     })
     const highligtedScaleRatio = interpolate(
       touchDistance, {
       inputRange:  [0, EXPANDED_ARC_RADIUS, 2 * EXPANDED_ARC_RADIUS],
-      outputRange: [1, HIGHLIGTHED_SCALE, 1],
-      extrapolateRight: 'clamp',
+      outputRange: [1, HIGHLIGTHED_SCALE_RATIO, 1],
+      extrapolate: 'clamp',
     })
-
-    this._translateX = multiply(expandX, highligtedTranslateRatio)
-
-    this._translateY = multiply(expandY, highligtedTranslateRatio)
-
-    this._scale = highligtedScaleRatio
 
     const deltaX = sub(expandX, touchX)
     const deltaY = sub(expandY, touchY)
@@ -477,7 +483,11 @@ class Bubble extends React.Component {
       isSelected,
     ])
 
-    this._backgroundColor = runBackgroundColor(isSelected)
+    this._translateX = multiply(expandX, highligtedTranslateRatio)
+    this._translateY = multiply(expandY, highligtedTranslateRatio)
+    this._scale = highligtedScaleRatio
+    this._backgroundColor = isSelectable ? runColor(isSelected, backgroundColor, selectedBackgroundColor) : backgroundColor
+    this._color = isSelectable ? runColor(isSelected, color, selectedColor) : color
   }
 
   _getAngleRotation = () => {
@@ -508,19 +518,14 @@ class Bubble extends React.Component {
   }
 
   render() {
-    const {
+    let {
       children,
       radius,
       origin,
-      backgroundColor: forcedBackgroundColor,
+      backgroundColor,
+      color,
+      isSelectable
     } = this.props
-
-    // TODO used animation to change the color
-    if (forcedBackgroundColor) {
-      backgroundColor = forcedBackgroundColor
-    } else {
-      backgroundColor = this._backgroundColor
-    }
 
     return (
       <View>
@@ -532,7 +537,7 @@ class Bubble extends React.Component {
               left: origin.x - radius,
               width: radius * 2,
               borderRadius: radius,
-              backgroundColor: backgroundColor,
+              backgroundColor: isSelectable ? this._backgroundColor : backgroundColor,
               transform: [{
                 translateX: this._translateX,
                 translateY: this._translateY,
@@ -541,11 +546,16 @@ class Bubble extends React.Component {
             },
           ]}
         >  
-          <Text
-            style={styles.buttonText}
+          <Animated.Text
+            style={[
+              styles.buttonText,
+              {
+                color: isSelectable ? this._color : color,
+              },
+            ]}
           >
             {children}
-          </Text>
+          </Animated.Text>
         </Animated.View>
       </View>
     )
@@ -559,7 +569,8 @@ Bubble.defaultProps = {
   touch: {
     x: new Value(0),
     y: new Value(0),
-  }
+  },
+  isSelectable: false,
 }
 
 export default CheekyButton
