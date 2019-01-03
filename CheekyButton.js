@@ -283,7 +283,6 @@ class CheekyButton extends React.Component {
             position={position}
             backgroundColor={'#FFFFFF'}
             color={'#3F3F3F'}
-            isSelectable={true}
             selectedBackgroundColor={'#DA3140'}
             selectedColor={'#FFFFFF'}
             touch={{
@@ -362,7 +361,6 @@ class Bubble extends React.Component {
       color,
       selectedBackgroundColor,
       selectedColor,
-      isSelectable,
     } = props
     
     const {
@@ -486,8 +484,8 @@ class Bubble extends React.Component {
     this._translateX = multiply(expandX, highligtedTranslateRatio)
     this._translateY = multiply(expandY, highligtedTranslateRatio)
     this._scale = highligtedScaleRatio
-    this._backgroundColor = isSelectable ? runColor(isSelected, backgroundColor, selectedBackgroundColor) : backgroundColor
-    this._color = isSelectable ? runColor(isSelected, color, selectedColor) : color
+    this._backgroundColor = runColor(isSelected, backgroundColor, selectedBackgroundColor )
+    this._color = runColor(isSelected, color, selectedColor)
   }
 
   _getAngleRotation = () => {
@@ -522,9 +520,6 @@ class Bubble extends React.Component {
       children,
       radius,
       origin,
-      backgroundColor,
-      color,
-      isSelectable
     } = this.props
 
     return (
@@ -537,7 +532,7 @@ class Bubble extends React.Component {
               left: origin.x - radius,
               width: radius * 2,
               borderRadius: radius,
-              backgroundColor: isSelectable ? this._backgroundColor : backgroundColor,
+              backgroundColor: this._backgroundColor,
               transform: [{
                 translateX: this._translateX,
                 translateY: this._translateY,
@@ -550,7 +545,7 @@ class Bubble extends React.Component {
             style={[
               styles.buttonText,
               {
-                color: isSelectable ? this._color : color,
+                color: this._color,
               },
             ]}
           >
@@ -570,7 +565,6 @@ Bubble.defaultProps = {
     x: new Value(0),
     y: new Value(0),
   },
-  isSelectable: false,
 }
 
 export default CheekyButton
